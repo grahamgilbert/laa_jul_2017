@@ -41,15 +41,9 @@ Vagrant.configure("2") do |config|
     # your network.
     # config.vm.network "public_network"
 
-    # Share an additional folder to the guest VM. The first argument is
-    # the path on the host to the actual folder. The second argument is
-    # the path on the guest to mount the folder. And the optional third
-    # argument is a set of non-required options.
-    # config.vm.synced_folder "../data", "/vagrant_data"
-
     # Provider-specific configuration so you can fine-tune various
     # backing providers for Vagrant. These expose provider-specific options.
-    config.vm.provider "vmware_fusion" do |v|
+    puppet.vm.provider "vmware_fusion" do |v|
       v.vmx["memsize"] = "4096"
       v.vmx["numvcpus"] = "2"
     end
@@ -92,6 +86,8 @@ Vagrant.configure("2") do |config|
     chmod 600 /root/.ssh/id_rsa
     ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
     repo_deb_path=$(mktemp)
+    cp -R /vagrant/r10k_cache /var/cache/r10k
+    chmod -R 777 /var/cache/r10k
     wget --output-document=${repo_deb_path} ${REPO_DEB_URL}
     dpkg -i ${repo_deb_path}
     apt-get update > /dev/null
@@ -106,18 +102,19 @@ Vagrant.configure("2") do |config|
     /opt/puppetlabs/bin/puppetserver gem install lookup_http
     /opt/puppetlabs/puppet/bin/gem install lookup_http
     echo "Running 10k"
-    r10k deploy environment -pv
-    puppet module install crayfishx/hiera_http
-    puppetserver gem install CFPropertyList
+    r10k deploy environment production -pv
+    rm -rf /etc/puppetlabs/code/environments/production/modules/hiera_http
+    git -C /etc/puppetlabs/code/environments/production/modules clone https://github.com/crayfishx/hiera-http.git hiera_http
+    /opt/puppetlabs/bin/puppetserver gem install CFPropertyList
     cp /vagrant/plist.rb /opt/puppetlabs/puppet/lib/ruby/vendor_ruby/puppet/util/plist.rb
     systemctl start puppetserver
     systemctl enable puppetserver
     SHELL
   end
-  config.vm.define "app" do |app|
+  config.vm.define "inventory" do |app|
     app.vm.box = "bento/ubuntu-16.04"
     app.vm.network "private_network", ip: "192.168.33.11"
-    app.vm.hostname = "app.londonappleadmins.org.uk"
+    app.vm.hostname = "inventory.londonappleadmins.org.uk"
     app.vm.provision "shell", inline: <<-SHELL
     #
     # This bootstraps Puppet Server on Ubuntu 16.04 LTS.
@@ -128,7 +125,25 @@ Vagrant.configure("2") do |config|
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
     apt-get update > /dev/null
     apt-get install -y docker-ce
-    sh /vagrant/hiera_backend_app/build_and_run.sh
+    sh /vagrant/basicinventory/build_and_run.sh
+    SHELL
+
+  end
+  config.vm.define "flaskapp" do |app|
+    app.vm.box = "bento/ubuntu-16.04"
+    app.vm.network "private_network", ip: "192.168.33.12"
+    app.vm.hostname = "flaskapp.londonappleadmins.org.uk"
+    app.vm.provision "shell", inline: <<-SHELL
+    #
+    # This bootstraps Puppet Server on Ubuntu 16.04 LTS.
+    #
+    repo_deb_path=$(mktemp)
+    wget --output-document=${repo_deb_path} https://download.docker.com/linux/ubuntu/gpg
+    apt-key add ${repo_deb_path}
+    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    apt-get update > /dev/null
+    apt-get install -y docker-ce
+    sh /vagrant/basicinventory/build_and_run.sh
     SHELL
 
   end

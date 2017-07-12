@@ -1,0 +1,11 @@
+
+*.pyc
+
+r10k.yaml
+
+ssh/id_rsa
+
+Vagrantfile
+.vagrant/
+r10k_cache/
+production

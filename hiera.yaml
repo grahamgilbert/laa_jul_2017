@@ -1,0 +1,31 @@
+---
+
+version: 5
+defaults:  # Used for any hierarchy level that omits these keys.
+  datadir: /etc/puppetlabs/code/environments/%{environment}/hieradata   # This path is relative to hiera.yaml's directory.
+  data_hash: yaml_data  # Use the built-in YAML backend.
+
+hierarchy:
+  - name: "Hiera-HTTP lookup"
+    lookup_key: hiera_http
+    uris:
+      - http://192.168.33.12/lost_stolen/%{::system_profiler.serial_number}
+      - http://192.168.33.12/windows_vm/%{::system_profiler.serial_number}
+      - http://192.168.33.12/encryption_required/%{::system_profiler.serial_number}
+    options:
+      output: json
+      ignore_404: true
+  - name: "Per node data"
+    path: "nodes/%{::trusted.certname}.yaml"
+  - name: "Serial number data"
+    path: "serial_number/%{::system_profiler.serial_number}.yaml"
+  - name: "Build type"
+    path: "osfamily/%{::osfamily}/build_type/%{::build_type}.yaml"
+  - name: "OS Family virtual"
+    path: "virtual/%{::osfamily}/%{::virtual}.yaml"
+  - name: "OS Family"
+    path: "virtual/%{::osfamily}.yaml"
+  - name: "Vritual"
+    path: "virtual/%{::virtual}.yaml"
+  - name: "Common"
+    path: common.yaml
